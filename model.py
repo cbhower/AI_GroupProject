@@ -33,8 +33,8 @@ model = Sequential()
 
 source_layer = Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(224, 224, 3))
 target_layer = Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(224, 224, 3))
-source_layer.trainable = False
-target_layer.trainable = False
+source_layer.trainable = True
+target_layer.trainable = True
 
 model.add(source_layer)
 model.add(target_layer)
@@ -71,36 +71,39 @@ iteration = 0
 
 while iteration < num_epochs:
     num_epochs -= 1
-    '''
+
     if num_epochs % 2 == 0:
-        source_input.trainable = True
-        source_output.trainable = True
+        source_layer.trainable = True
+        source_output_layer.trainable = True
         # source specific layers on
         # x_train = source data
         # y_train = source labels
     else:
-        target_input.trainable = True
-        target_output.trainable = True
+        target_layer.trainable = True
+        target_output_layer.trainable = True
 
         # Target specific layers on
         # x_train = target data
         # y_train = target labels
-    '''
 
+    print(source_layer.get_weights())
     # train non-frozen layers
     model.fit(X_train, to_categorical(Y_train),
               batch_size=64,
               shuffle=True,
-              epochs=4,
+              epochs=1,
               validation_data=(X_test, to_categorical(Y_test)),
               callbacks=[EarlyStopping(min_delta=0.001, patience=3)])
 
+    print(source_layer.get_weights())
     # Evaluate the model
     scores = model.evaluate(X_test, to_categorical(Y_test))
 
     print('Loss: %.3f' % scores[0])
     print('Accuracy: %.3f' % scores[1])
 
-    target_output.trainable = False
-    target_output.trainable = False
+    source_layer.trainable = False
+    target_layer.trainable = False
+    source_output_layer.trainable = False
+    target_output_layer.trainable = False
 
