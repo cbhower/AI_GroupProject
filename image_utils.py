@@ -25,20 +25,20 @@ def load_data():
     labels = []
     i = 0
     for dir in image_dir:
-        label_buf = [0, 0, 0]
+        #label_buf = [0, 0, 0]
         file_path = dir_path + '/' + dir + '/images/'
         files = walk_dir(file_path)
         for file in files:
-            label_buf[i] = 1
+            #label_buf[i] = 1
             image_path = file_path + file
             rescaled_image = rescale_image(image_path, 224, 224)
             #rescaled_image = convert_color(rescaled_image, 'L')
             buf = pil_to_nparray(rescaled_image)
             buf /= 255.
-            images.append(buf)
-            labels.append(label_buf)
+            if buf.shape == (224, 224, 3):
+                images.append(buf)
+                labels.append([i])
         i += 1
-
     return images, labels
 
 
@@ -52,4 +52,8 @@ def pil_to_nparray(pil_image):
 
 
 if __name__ == '__main__':
-    load_data()
+    x, y = load_data()
+    y = np.array(y)
+    for elem in y:
+        if elem.shape != (3,):
+            print(elem)
