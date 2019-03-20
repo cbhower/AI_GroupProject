@@ -16,6 +16,10 @@ from keras.utils import to_categorical
 import numpy as np
 
 
+(X_train_source, Y_train_source), (X_test_source, Y_test_source) = cifar10.load_data()
+(X_train_target, Y_train_target), (X_test_target, Y_test_target) = cifar100.load_data(label_mode = "coarse")
+
+
 ########### BUILD 5 INDIVIDUAL MODELS AND CONNECT INTO 1#######################
 
 # source input model
@@ -58,7 +62,7 @@ source_pred_model.summary()
 
 # target output model
 target_pred_inputs = Input(shape=(512,))
-target_pred = Dense(10, activation='softmax')(target_pred_inputs)
+target_pred = Dense(20, activation='softmax')(target_pred_inputs)
 target_pred_model = Model(inputs=target_pred_inputs, outputs = target_pred)
 
 
@@ -72,6 +76,10 @@ model_pred_source = source_pred_model(m)
 model_source = Model(inputs=model_inputs_source , outputs = model_pred_source)
 model_source.summary()
 
+model_source.compile(loss='categorical_crossentropy',
+              optimizer= Adam(lr=0.0001, decay=1e-6),
+              metrics=['accuracy'])
+
 ########## TARGET MODEL
 model_inputs_target = Input(shape=(32,32,3))
 m2 = target_input_model(model_inputs_target)
@@ -81,6 +89,28 @@ model_pred_target = target_pred_model(m2)
 model_target = Model(inputs=model_inputs_target , outputs = model_pred_target)
 model_target.summary()
 
+model_target.compile(loss='categorical_crossentropy',
+              optimizer= Adam(lr=0.0001, decay=1e-6),
+              metrics=['accuracy'])
 
+###############################################################################
+num_epochs = 4
+iteration = 0
 
+while iteration < num_epochs:
+    num_epochs -= 1
+    if num_epochs % 2 != 0:
+      model_source.fit(X_train_source, to_categorical(Y_train_source),
+                       batch_size=100,
+                       shuffle=True,
+                       epochs=2,
+                       validation_data=(X_test_source, to_categorical(Y_test_source)),
+                       callbacks=[EarlyStopping(min_delta=0.001, patience=3)])
 
+    else:
+        model_target.fit(X_train_target, to_categorical(Y_train_target),
+                         batch_size=100,
+                         shuffle=True,
+                         epochs=5,
+                         validation_data=(X_test_target, to_categorical(Y_test_target)),
+                         callbacks=[EarlyStopping(min_delta=0.001, patience=3)])
