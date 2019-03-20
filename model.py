@@ -1,109 +1,78 @@
-from keras.callbacks import EarlyStopping
-from keras.datasets import cifar10
+from __future__ import print_function
+import keras
+from keras.datasets import mnist, cifar10
+from keras.layers import Dense, Flatten
+from keras.layers import Conv2D, MaxPooling2D
 from keras.models import Sequential
-from keras.layers.core import Dense, Dropout, Flatten
-from keras.layers.convolutional import Conv2D
-from keras.optimizers import Adam
-from keras.layers.pooling import MaxPooling2D
-from keras.utils import to_categorical
-import numpy as np
-import image_utils
+import matplotlib.pylab as plt
 
+batch_size = 128
+num_classes = 10
+epochs = 10
 
-X, Y = image_utils.load_data()
+# input image dimensions
+img_x, img_y = 32, 32
 
-X_train = np.array(X[0:1200])
-Y_train = np.array(Y[0:1200])
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
 
-X_test = np.array(X[1200:])
-Y_test = np.array(Y[1200:])
+# load the MNIST data set, which already splits into train and test sets for us
+#(x_train, y_train), (x_test, y_test) = mnist.load_data()
 
-print(Y_train.shape)
-print(Y_test.shape)
+# reshape the data into a 4D tensor - (sample_number, x_img_size, y_img_size, num_channels)
+# because the MNIST is greyscale, we only have a single channel - RGB colour images would have 3
+x_train = x_train.reshape(x_train.shape[0], img_x, img_y, 3)
+x_test = x_test.reshape(x_test.shape[0], img_x, img_y, 3)
+input_shape = (img_x, img_y, 3)
 
+# convert the data to the right type
+x_train = x_train.astype('float32')
+x_test = x_test.astype('float32')
+x_train /= 255
+x_test /= 255
+print('x_train shape:', x_train.shape)
+print(x_train.shape[0], 'train samples')
+print(x_test.shape[0], 'test samples')
 
-#(X_train, Y_train), (X_test, Y_test) = cifar10.load_data()
-
-#print(Y_train[0])
-
-num_epochs = 100
+# convert class vectors to binary class matrices - this is for use in the
+# categorical_crossentropy loss below
+y_train = keras.utils.to_categorical(y_train, num_classes)
+y_test = keras.utils.to_categorical(y_test, num_classes)
 
 model = Sequential()
-# Source specic input layer
-
-source_layer = Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(224, 224, 3))
-target_layer = Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(224, 224, 3))
-source_layer.trainable = True
-target_layer.trainable = True
-
-model.add(source_layer)
-model.add(target_layer)
-
-model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
+model.add(Conv2D(32, kernel_size=(5, 5), strides=(1, 1),
+                 activation='relu',
+                 input_shape=input_shape))
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+model.add(Conv2D(64, (5, 5), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
-
-model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
-
 model.add(Flatten())
-model.add(Dense(1024, activation='relu'))
-model.add(Dropout(0.5))
+model.add(Dense(1000, activation='relu'))
+model.add(Dense(num_classes, activation='softmax'))
 
-
-source_output_layer = Dense(3, activation='softmax')
-target_output_layer = Dense(3, activation='softmax')
-source_output_layer.trainable = False
-target_output_layer.trainable = False
-
-model.add(source_output_layer)
-model.add(target_output_layer)
-
-# Compile the model
-model.compile(loss='categorical_crossentropy',
-              optimizer=Adam(lr=0.0001, decay=1e-6),
+model.compile(loss=keras.losses.categorical_crossentropy,
+              optimizer=keras.optimizers.Adam(),
               metrics=['accuracy'])
 
-iteration = 0
 
-while iteration < num_epochs:
-    num_epochs -= 1
+class AccuracyHistory(keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.acc = []
 
-    if num_epochs % 2 == 0:
-        source_layer.trainable = True
-        source_output_layer.trainable = True
-        # source specific layers on
-        # x_train = source data
-        # y_train = source labels
-    else:
-        target_layer.trainable = True
-        target_output_layer.trainable = True
+    def on_epoch_end(self, batch, logs={}):
+        self.acc.append(logs.get('acc'))
 
-        # Target specific layers on
-        # x_train = target data
-        # y_train = target labels
+history = AccuracyHistory()
 
-    print(source_layer.get_weights())
-    # train non-frozen layers
-    model.fit(X_train, to_categorical(Y_train),
-              batch_size=64,
-              shuffle=True,
-              epochs=1,
-              validation_data=(X_test, to_categorical(Y_test)),
-              callbacks=[EarlyStopping(min_delta=0.001, patience=3)])
-
-    print(source_layer.get_weights())
-    # Evaluate the model
-    scores = model.evaluate(X_test, to_categorical(Y_test))
-
-    print('Loss: %.3f' % scores[0])
-    print('Accuracy: %.3f' % scores[1])
-
-    source_layer.trainable = False
-    target_layer.trainable = False
-    source_output_layer.trainable = False
-    target_output_layer.trainable = False
-
+model.fit(x_train, y_train,
+          batch_size=batch_size,
+          epochs=epochs,
+          verbose=1,
+          validation_data=(x_test, y_test),
+          callbacks=[history])
+score = model.evaluate(x_test, y_test, verbose=0)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+plt.plot(range(1, 11), history.acc)
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.show()
