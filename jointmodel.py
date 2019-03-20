@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Mar 19 19:44:39 2019
+Created on Wed Mar 20 07:39:50 2019
 
 @author: Christian
 """
-from keras.layers import Input, Dense
+
+from keras.layers import Input, Dense, concatenate
 from keras.models import Model
 from keras.callbacks import EarlyStopping
 from keras.datasets import cifar10, cifar100
@@ -23,25 +24,23 @@ from keras.utils import to_categorical
 source_inputs = Input(shape=(32,32,3), name = 'source_inputs')
 target_inputs = Input(shape=(32,32,3), name = 'target_inputs')
 
-# a layer instance is callable on a tensor, and returns a tensor
-x = Conv2D(32, kernel_size=(3, 3), activation='relu')(source_inputs)
-x = MaxPooling2D(pool_size=(2, 2))(x)
-x = Dropout(0.25)(x)
-x = Flatten()(x)
-x = Dense(100, activation='relu')(x)
-source_pred = Dense(10, activation='softmax', name = 'source_pred')(x)
 
-x1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(target_inputs)
-x1 = MaxPooling2D(pool_size=(2, 2))(x1)
-x1 = Dropout(0.25)(x1)
-x1 = Flatten()(x1)
-x1 = Dense(100, activation='relu')(x1)
-target_pred = Dense(20, activation='softmax', name = 'target_pred')(x1)
+# Target Layers
+conv1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(source_inputs)
+conv2 = Conv2D(32, kernel_size=(3, 3), activation='relu')(target_inputs)
+
+# Shared Layers
+conc = concatenate([conv1, conv2])
+pool1 = MaxPooling2D(pool_size=(2, 2))(conc)
+drop1 = Dropout(0.25)(pool1)
+flat1 = Flatten()(drop1)
+dense1 = Dense(100, activation='relu')(flat1)
+
+# Task Specific Output Layers
+source_pred = Dense(10, activation='softmax', name = 'source_pred')(dense1)
+target_pred = Dense(20, activation='softmax', name = 'target_pred')(dense1)
 
 
-
-# This creates a model that includes
-# the Input layer and three Dense layers
 model = Model(inputs=[source_inputs, target_inputs], outputs= [source_pred, target_pred])
 model.compile(loss='categorical_crossentropy',
               optimizer= Adam(lr=0.0001, decay=1e-6),
